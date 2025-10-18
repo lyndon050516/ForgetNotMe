@@ -1,6 +1,6 @@
 """
 LLM and Audio Processing Module for Forget Me Not
-Handles audio transcription using Whisper and text summarization using Llama API.
+Handles audio transcription using Whisper and text summarization using Groq API.
 """
 
 import os
@@ -10,27 +10,29 @@ import json
 from typing import Optional
 
 class LLMAudioProcessor:
-    def __init__(self, llama_api_key=None, llama_api_url=None):
+    def __init__(self, groq_api_key=None, groq_api_url=None, groq_model=None):
         """
         Initialize the LLM and Audio Processor.
         
         Args:
-            llama_api_key (str): API key for Llama service
-            llama_api_url (str): URL for Llama API endpoint
+            groq_api_key (str): API key for Groq service
+            groq_api_url (str): URL for Groq API endpoint
+            groq_model (str): Groq model to use
         """
         # Load Whisper model (base model for good balance of speed and accuracy)
         print("Loading Whisper model...")
         self.whisper_model = whisper.load_model("base")
         print("Whisper model loaded successfully")
         
-        # Llama API configuration
-        self.llama_api_key = llama_api_key or os.getenv('LLAMA_API_KEY')
-        self.llama_api_url = llama_api_url or os.getenv('LLAMA_API_URL', 'https://api.llama-api.com/chat/completions')
+        # Groq API configuration
+        self.groq_api_key = groq_api_key or os.getenv('GROQ_API_KEY')
+        self.groq_api_url = groq_api_url or os.getenv('GROQ_API_URL', 'https://api.groq.com/openai/v1/chat/completions')
+        self.groq_model = groq_model or os.getenv('GROQ_MODEL', 'llama-3.1-70b-versatile')
         
-        if not self.llama_api_key:
-            print("Warning: No Llama API key found. Set LLAMA_API_KEY environment variable.")
+        if not self.groq_api_key:
+            print("Warning: No Groq API key found. Set GROQ_API_KEY environment variable.")
         else:
-            print("Llama API configuration loaded")
+            print(f"Groq API configuration loaded (model: {self.groq_model})")
     
     def transcribe_audio(self, audio_file_path):
         """
@@ -62,7 +64,7 @@ class LLMAudioProcessor:
     
     def summarize_text(self, transcript):
         """
-        Summarize the transcript using Llama API.
+        Summarize the transcript using Groq API.
         
         Args:
             transcript (str): Text to summarize
@@ -71,12 +73,12 @@ class LLMAudioProcessor:
             str: Summarized text, or None if summarization failed
         """
         try:
-            if not self.llama_api_key:
-                print("No Llama API key available. Returning truncated transcript.")
+            if not self.groq_api_key:
+                print("No Groq API key available. Returning truncated transcript.")
                 # Return first 200 characters as a fallback
                 return transcript[:200] + "..." if len(transcript) > 200 else transcript
             
-            print("Sending request to Llama API for summarization...")
+            print(f"Sending request to Groq API for summarization (model: {self.groq_model})...")
             
             # Prepare the prompt for summarization
             prompt = f"""Please summarize the key points of this conversation in 1-2 sentences. Focus on the main topics discussed and any important information shared:
@@ -85,15 +87,19 @@ class LLMAudioProcessor:
 
 Summary:"""
             
-            # Prepare API request
+            # Prepare API request (Groq uses OpenAI-compatible format)
             headers = {
-                'Authorization': f'Bearer {self.llama_api_key}',
+                'Authorization': f'Bearer {self.groq_api_key}',
                 'Content-Type': 'application/json'
             }
             
             data = {
-                'model': 'llama-3.1-8b-instant',
+                'model': self.groq_model,
                 'messages': [
+                    {
+                        'role': 'system',
+                        'content': 'You are a helpful assistant that creates concise summaries of conversations. Focus on key topics, important details, and memorable information.'
+                    },
                     {
                         'role': 'user',
                         'content': prompt
@@ -104,7 +110,7 @@ Summary:"""
             }
             
             # Make API request
-            response = requests.post(self.llama_api_url, headers=headers, json=data, timeout=30)
+            response = requests.post(self.groq_api_url, headers=headers, json=data, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
@@ -112,12 +118,12 @@ Summary:"""
                 print(f"Summarization successful: {len(summary)} characters")
                 return summary
             else:
-                print(f"Llama API error: {response.status_code} - {response.text}")
+                print(f"Groq API error: {response.status_code} - {response.text}")
                 # Fallback to truncated transcript
                 return transcript[:200] + "..." if len(transcript) > 200 else transcript
                 
         except requests.exceptions.Timeout:
-            print("Llama API request timed out. Using fallback summary.")
+            print("Groq API request timed out. Using fallback summary.")
             return transcript[:200] + "..." if len(transcript) > 200 else transcript
         except Exception as e:
             print(f"Error summarizing text: {str(e)}")
@@ -167,7 +173,7 @@ Summary:"""
             list: List of key topics/keywords
         """
         try:
-            if not self.llama_api_key:
+            if not self.groq_api_key:
                 # Simple keyword extraction fallback
                 words = transcript.lower().split()
                 # Filter out common words and return top words
@@ -176,7 +182,7 @@ Summary:"""
                 keywords = [word for word in words if word not in common_words and len(word) > 3]
                 return list(set(keywords))[:10]  # Return top 10 unique keywords
             
-            # Use Llama API for better keyword extraction
+            # Use Groq API for better keyword extraction
             prompt = f"""Extract the main topics and keywords from this conversation. Return them as a comma-separated list:
 
 {transcript}
@@ -184,13 +190,17 @@ Summary:"""
 Keywords:"""
             
             headers = {
-                'Authorization': f'Bearer {self.llama_api_key}',
+                'Authorization': f'Bearer {self.groq_api_key}',
                 'Content-Type': 'application/json'
             }
             
             data = {
-                'model': 'llama-3.1-8b-instant',
+                'model': self.groq_model,
                 'messages': [
+                    {
+                        'role': 'system',
+                        'content': 'You are a helpful assistant that extracts key topics and keywords from text.'
+                    },
                     {
                         'role': 'user',
                         'content': prompt
@@ -200,7 +210,7 @@ Keywords:"""
                 'temperature': 0.2
             }
             
-            response = requests.post(self.llama_api_url, headers=headers, json=data, timeout=15)
+            response = requests.post(self.groq_api_url, headers=headers, json=data, timeout=15)
             
             if response.status_code == 200:
                 result = response.json()

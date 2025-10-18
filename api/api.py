@@ -12,7 +12,10 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 import numpy as np
 import face_recognition
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
 # Import our custom modules
 from face_recognition_module import FaceRecognitionManager

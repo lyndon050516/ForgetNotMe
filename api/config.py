@@ -16,9 +16,10 @@ class Config:
     FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
     FLASK_DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
     
-    # API Configuration
-    LLAMA_API_KEY = os.getenv('LLAMA_API_KEY')
-    LLAMA_API_URL = os.getenv('LLAMA_API_URL', 'https://api.llama-api.com/chat/completions')
+    # API Configuration - Groq
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+    GROQ_API_URL = os.getenv('GROQ_API_URL', 'https://api.groq.com/openai/v1/chat/completions')
+    GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama-3.1-70b-versatile')
     
     # Face Recognition Configuration
     FACE_CONFIDENCE_THRESHOLD = float(os.getenv('FACE_CONFIDENCE_THRESHOLD', 0.6))
@@ -39,8 +40,8 @@ class Config:
         """Validate configuration and print warnings."""
         warnings = []
         
-        if not cls.LLAMA_API_KEY:
-            warnings.append("LLAMA_API_KEY not set - will use fallback text processing")
+        if not cls.GROQ_API_KEY:
+            warnings.append("GROQ_API_KEY not set - will use fallback text processing")
         
         if not os.path.exists(cls.UPLOAD_FOLDER):
             os.makedirs(cls.UPLOAD_FOLDER, exist_ok=True)
@@ -51,6 +52,6 @@ class Config:
             for warning in warnings:
                 print(f"  - {warning}")
         else:
-            print("Configuration validated successfully")
+            print(f"Configuration validated successfully (using Groq model: {cls.GROQ_MODEL})")
         
         return len(warnings) == 0
